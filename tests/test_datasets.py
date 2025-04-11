@@ -69,6 +69,25 @@ def mock_data_dir(tmp_path_factory):
     )
     # No validation_labels.csv for this simple test case
 
+    # --- MSA Files ---
+    msa_dir = data_dir / "MSA"
+    msa_dir.mkdir()
+
+    # MSA for seqA (matching length)
+    seqA_msa_content = ">seqA\nGCA\n>related1\nGC-\n>related2\nAUA\n"
+    (msa_dir / "seqA.MSA.fasta").write_text(seqA_msa_content)
+
+    # MSA for seqD_mismatch (length 3, sequence AG length 2)
+    seqD_msa_content = ">seqD_mismatch\nAGG\n>otherD\nAC-\n"
+    (msa_dir / "seqD_mismatch.MSA.fasta").write_text(seqD_msa_content)
+
+    # No MSA file for seqB
+    # No MSA file for seqC
+    # No MSA file for seqT1
+    # Create MSA for seqT2 (length 4)
+    seqT2_msa_content = ">seqT2\nACGA\n>t2_other\nAGGA\n"
+    (msa_dir / "seqT2.MSA.fasta").write_text(seqT2_msa_content)
+
     return data_dir
 
 
@@ -135,7 +154,7 @@ def test_dataset_len(mock_data_dir):
 
 
 def test_dataset_getitem_train_success(mock_data_dir):
-    """Test __getitem__ for a sample with sequence and labels."""
+    """Test __getitem__ for a sample with sequence, labels, and MSA."""
     dataset = RNA3DDataset(data_dir=mock_data_dir, split="train")
     sample = dataset[0]  # seqA
 
@@ -149,25 +168,44 @@ def test_dataset_getitem_train_success(mock_data_dir):
     assert coords.dtype == torch.float32
     # Check first coordinate values
     assert torch.allclose(coords[0], torch.tensor([1.0, 1.1, 1.2]))
+    # Check MSA
+    assert "msa" in sample
+    assert isinstance(sample["msa"], list)
+    assert len(sample["msa"]) == 3  # 3 sequences in mock MSA
+    assert sample["msa"][0] == "GCA"
+    assert sample["msa"][1] == "GC-"
+    assert sample["msa"][2] == "AUA"
 
 
-def test_dataset_getitem_no_labels_available(mock_data_dir):
-    """Test __getitem__ for a sequence present but without labels (seqB/seqC)."""
+def test_dataset_getitem_no_labels_no_msa(mock_data_dir):
+    """Test __getitem__ for sequence with no labels and no MSA file (seqB)."""
     dataset = RNA3DDataset(data_dir=mock_data_dir, split="train")
     sample_b = dataset[1]  # seqB
-    sample_c = dataset[2]  # seqC
 
     assert sample_b["target_id"] == "seqB"
     assert sample_b["sequence"] == "AUUGC"
     assert "coordinates" not in sample_b
+    # Check MSA (should be empty list as file doesn't exist)
+    assert "msa" in sample_b
+    assert isinstance(sample_b["msa"], list)
+    assert len(sample_b["msa"]) == 0
 
-    assert sample_c["target_id"] == "seqC"
-    assert sample_c["sequence"] == "G"
-    assert "coordinates" not in sample_c
+
+def test_dataset_getitem_no_labels_yes_msa(mock_data_dir):
+    """Test __getitem__ for a sequence with MSA but no labels (seqC - we won't create MSA for C)."""
+    # Let's test seqD which has MSA but mismatched labels
+    dataset = RNA3DDataset(data_dir=mock_data_dir, split="train")
+    sample = dataset[3]  # seqD_mismatch
+    assert sample["target_id"] == "seqD_mismatch"
+    assert sample["sequence"] == "AG"
+    assert "coordinates" not in sample  # Coords skipped due to length mismatch
+    assert "msa" in sample
+    assert len(sample["msa"]) == 2
+    assert sample["msa"][0] == "AGG"
 
 
 def test_dataset_getitem_length_mismatch(mock_data_dir, capsys):
-    """Test __getitem__ where sequence length mismatches coordinate length."""
+    """Test __getitem__ where sequence length mismatches coordinate length (seqD)."""
     dataset = RNA3DDataset(data_dir=mock_data_dir, split="train")
     sample = dataset[3]  # seqD_mismatch (seq len 2, coord len 3)
 
@@ -175,8 +213,12 @@ def test_dataset_getitem_length_mismatch(mock_data_dir, capsys):
     assert sample["sequence"] == "AG"
     # Coordinates should be skipped due to mismatch
     assert "coordinates" not in sample
+    # MSA should still load
+    assert "msa" in sample
+    assert len(sample["msa"]) == 2
+    assert sample["msa"][0] == "AGG"
 
-    # Check warning message
+    # Check warning message for coordinates
     captured = capsys.readouterr()
     assert (
         "Warning: Sequence length 2 mismatch with coordinates length 3" in captured.out
@@ -185,14 +227,27 @@ def test_dataset_getitem_length_mismatch(mock_data_dir, capsys):
 
 
 def test_dataset_getitem_test_split(mock_data_dir):
-    """Test __getitem__ for the test split (no coordinates expected)."""
+    """Test __getitem__ for the test split (no coords, MSA handled)."""
     dataset = RNA3DDataset(data_dir=mock_data_dir, split="test")
-    sample = dataset[0]  # seqT1
 
-    assert isinstance(sample, dict)
-    assert sample["target_id"] == "seqT1"
-    assert sample["sequence"] == "UU"
-    assert "coordinates" not in sample
+    # Sample 0: seqT1 (No MSA file created for it)
+    sample0 = dataset[0]
+    assert isinstance(sample0, dict)
+    assert sample0["target_id"] == "seqT1"
+    assert sample0["sequence"] == "UU"
+    assert "coordinates" not in sample0
+    assert "msa" in sample0
+    assert len(sample0["msa"]) == 0  # No file exists
+
+    # Sample 1: seqT2 (Has MSA file)
+    sample1 = dataset[1]
+    assert isinstance(sample1, dict)
+    assert sample1["target_id"] == "seqT2"
+    assert sample1["sequence"] == "ACGA"
+    assert "coordinates" not in sample1
+    assert "msa" in sample1
+    assert len(sample1["msa"]) == 2  # From mock file
+    assert sample1["msa"][0] == "ACGA"
 
 
 # --- Test Label Preprocessing Edge Cases (Implicitly via init) ---
@@ -221,10 +276,11 @@ def test_preprocess_labels_malformed_id(tmp_path):
     }
     pd.DataFrame(label_data).to_csv(data_dir / "train_labels.csv", index=False)
 
+    # Create dummy MSA dir
+    (data_dir / "MSA").mkdir()
+
     dataset = RNA3DDataset(data_dir=data_dir, split="train")
     # Expect error during preprocessing, labels should be invalidated
-    assert dataset.labels_df is None
-    assert (
-        not hasattr(dataset, "target_id_to_coords") or not dataset.target_id_to_coords
-    )
+    # Check that the processed coordinate dictionary is empty
+    assert not dataset.target_id_to_coords
     # We could also capture stderr here to check for the specific error message

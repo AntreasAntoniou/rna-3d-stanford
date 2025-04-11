@@ -1,5 +1,6 @@
 from torch.utils.data import DataLoader, Dataset
 import torch
+from pathlib import Path
 
 # Default number of workers (can be tuned)
 DEFAULT_NUM_WORKERS = torch.get_num_threads() // 2 if torch.get_num_threads() > 1 else 0
@@ -56,6 +57,37 @@ def get_dataloader(
         f"Created DataLoader with batch_size={batch_size}, shuffle={shuffle}, num_workers={num_workers}"
     )
     return dataloader
+
+
+def parse_fasta_msa(fasta_path: Path) -> list[str]:
+    """Parses a multi-sequence FASTA file (MSA) using Biopython.
+
+    Args:
+        fasta_path (Path): Path to the FASTA file.
+
+    Returns:
+        list[str]: A list of sequences found in the file.
+                   Returns an empty list if file is empty or parsing fails.
+    """
+    sequences = []
+    try:
+        # Use Biopython's SeqIO parser
+        from Bio import SeqIO
+
+        for record in SeqIO.parse(fasta_path, "fasta"):
+            # Convert Seq object to string and add to list
+            sequences.append(str(record.seq).upper())
+    except FileNotFoundError:
+        # Let the Dataset class handle this warning/error
+        pass
+    except ImportError:
+        print("Error: Biopython is required for FASTA parsing but not installed.")
+        # Return empty list or raise? Returning empty avoids crashing DataLoader.
+        return []
+    except Exception as e:
+        print(f"Error parsing MSA file {fasta_path} with Biopython: {e}")
+        return []  # Return empty list on error
+    return sequences
 
 
 # Example Usage (optional):

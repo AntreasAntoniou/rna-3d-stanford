@@ -18,6 +18,7 @@ dependencies = [
     "wandb", # For experiment tracking
     "torchvision",
     "torchaudio",
+    "biopython", # For FASTA parsing
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -40,6 +41,7 @@ dev = [
     "pytest-sugar", # Nicer test output
     "pytest-xdist", # Parallel test execution
     "pytest-cov",   # Code coverage reporting
+    "biopython",    # For dev testing of data utils maybe
 ]
 
 [tool.black]
@@ -71,4 +73,9 @@ max-complexity = 10
 
 [tool.ruff.isort]
 # Optional: Ruff can handle isort's job
-# force-single-line = true # Example setting 
+# force-single-line = true # Example setting
+
+[tool.setuptools.packages.find]
+where = ["."] # Search in the root directory
+include = ["protein_rna_3d*"] # Include only our package
+exclude = ["tests*", "scripts*", "data*", "docs*"] # Exclude other top-level dirs 
