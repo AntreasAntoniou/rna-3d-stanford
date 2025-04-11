@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protein_rna_3d"
+version = "0.1.0"
+description = "Predicting RNA 3D structures from sequences for the Stanford RNA 3D Folding competition."
+readme = "README.md"
+requires-python = ">=3.9"
+# Add core dependencies here later, e.g.,
+dependencies = [
+    "numpy", # Also needed for core logic
+    "pandas", # Likely needed for data handling
+    "torch",
+    "transformers",
+    "accelerate",
+    "wandb", # For experiment tracking
+    "torchvision",
+    "torchaudio",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Choose an appropriate license
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/rna-3d-stanford" # Replace with your repo URL
+Repository = "https://github.com/your-username/rna-3d-stanford" # Replace with your repo URL
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0",
+    "isort>=5.12",
+    "ruff>=0.1",
+    "autoflake>=2.0",
+    "pytest>=7.0",
+    "numpy", # Added numpy for testing
+    "pytest-sugar", # Nicer test output
+    "pytest-xdist", # Parallel test execution
+    "pytest-cov",   # Code coverage reporting
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = []
+
+# Assume Python 3.9+
+target-version = "py39"
+
+[tool.ruff.mccabe]
+# Adjust complexity threshold if needed
+max-complexity = 10
+
+[tool.ruff.isort]
+# Optional: Ruff can handle isort's job
+# force-single-line = true # Example setting 
